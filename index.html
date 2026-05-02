@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>牙科診所 AI 一鍵排班</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">牙</div>
+          <div>
+            <h1>AI 一鍵排班</h1>
+            <p>牙科診所班表引擎</p>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="主要功能">
+          <button class="nav-item is-active" data-panel="scheduler">排班工作台</button>
+          <button class="nav-item" data-panel="people">人員設定</button>
+          <button class="nav-item" data-panel="sessions">醫生診次</button>
+          <button class="nav-item" data-panel="rules">公平規則</button>
+        </nav>
+
+        <div class="sidebar-summary">
+          <span>本週需求</span>
+          <strong id="sidebarDemand">0 診次</strong>
+          <small>每診：醫生 1、牙助 2、櫃檯 2</small>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">透明、可稽核、少一點人情壓力</p>
+            <h2>診所以醫生診次為中心，自動搭配牙助與櫃檯</h2>
+          </div>
+          <div class="actions">
+            <label class="week-picker">
+              排班週起日
+              <input id="weekStartInput" type="date" />
+            </label>
+            <button class="secondary" id="resetDemoBtn" type="button">載入範例</button>
+            <button class="primary" id="generateBtn" type="button">AI 一鍵排班</button>
+          </div>
+        </header>
+
+        <section class="panel is-visible" id="scheduler">
+          <div class="metrics-grid">
+            <div class="metric">
+              <span>完成率</span>
+              <strong id="coverageMetric">-</strong>
+            </div>
+            <div class="metric">
+              <span>公平分數</span>
+              <strong id="fairnessMetric">-</strong>
+            </div>
+            <div class="metric">
+              <span>缺口</span>
+              <strong id="gapMetric">-</strong>
+            </div>
+            <div class="metric">
+              <span>需人工確認</span>
+              <strong id="reviewMetric">-</strong>
+            </div>
+          </div>
+
+          <div class="workspace-grid">
+            <section class="board">
+              <div class="section-title">
+                <h3>產生班表</h3>
+                <button class="ghost" id="exportBtn" type="button">匯出 CSV</button>
+              </div>
+              <div class="schedule-table-wrap">
+                <table class="schedule-table">
+                  <thead>
+                    <tr>
+                      <th>日期</th>
+                      <th>時段</th>
+                      <th>醫生</th>
+                      <th>牙助</th>
+                      <th>櫃檯</th>
+                      <th>狀態</th>
+                    </tr>
+                  </thead>
+                  <tbody id="scheduleBody"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="board">
+              <div class="section-title">
+                <h3>公平性與原因</h3>
+              </div>
+              <div id="insightList" class="insight-list"></div>
+              <div class="section-title compact">
+                <h3>人員負載</h3>
+              </div>
+              <div id="loadList" class="load-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel" id="people">
+          <div class="editor-layout">
+            <section class="board">
+              <div class="section-title">
+                <h3>人員資料</h3>
+                <button class="ghost" id="addPersonBtn" type="button">新增人員</button>
+              </div>
+              <div class="person-list" id="personList"></div>
+            </section>
+
+            <section class="board">
+              <div class="section-title">
+                <h3 id="personFormTitle">快速設定</h3>
+              </div>
+              <form id="personForm" class="form-grid">
+                <input name="personId" type="hidden" />
+                <label>
+                  姓名
+                  <input name="name" required placeholder="例：林牙助" />
+                </label>
+                <label>
+                  角色
+                  <select name="role">
+                    <option value="doctor">醫生</option>
+                    <option value="assistant">牙助</option>
+                    <option value="frontdesk">櫃檯</option>
+                  </select>
+                </label>
+                <label>
+                  每週最多班數
+                  <input name="maxShifts" type="number" min="1" max="14" value="6" />
+                </label>
+                <label>
+                  技能標籤
+                  <input name="skills" placeholder="植牙,矯正" />
+                </label>
+                <fieldset class="availability-field span-2">
+                  <legend>可上班時段</legend>
+                  <div class="availability-actions">
+                    <button class="ghost" id="selectAllAvailabilityBtn" type="button">全選</button>
+                    <button class="ghost" id="clearAvailabilityBtn" type="button">清空</button>
+                  </div>
+                  <div class="availability-grid" id="availabilityGrid"></div>
+                </fieldset>
+                <label class="span-2">
+                  避免同班
+                  <input name="avoid" placeholder="輸入姓名，以逗號分隔" />
+                </label>
+                <label class="span-2">
+                  偏好同班
+                  <input name="preferWith" placeholder="輸入姓名，以逗號分隔" />
+                </label>
+                <label class="span-2">
+                  偏好上班時段
+                  <input name="preferSlots" placeholder="例：mon-am,fri-pm，可留空" />
+                </label>
+                <label class="span-2">
+                  不想上班時段
+                  <input name="avoidSlots" placeholder="例：sat-am,wed-night，可留空" />
+                </label>
+                <div class="form-actions span-2">
+                  <button class="primary" type="submit">儲存人員</button>
+                  <button class="secondary is-hidden" id="cancelEditPersonBtn" type="button">取消編輯</button>
+                </div>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel" id="sessions">
+          <div class="editor-layout">
+            <section class="board">
+              <div class="section-title">
+                <h3>醫生診次</h3>
+                <button class="ghost" id="addSessionBtn" type="button">新增診次</button>
+              </div>
+              <div id="sessionList" class="session-list"></div>
+            </section>
+
+            <section class="board">
+              <div class="section-title">
+                <h3>診次設定</h3>
+              </div>
+              <form id="sessionForm" class="form-grid">
+                <label>
+                  日期
+                  <select name="day">
+                    <option value="mon">週一</option>
+                    <option value="tue">週二</option>
+                    <option value="wed">週三</option>
+                    <option value="thu">週四</option>
+                    <option value="fri">週五</option>
+                    <option value="sat">週六</option>
+                  </select>
+                </label>
+                <label>
+                  時段
+                  <select name="period">
+                    <option value="am">早診</option>
+                    <option value="pm">午診</option>
+                    <option value="night">晚診</option>
+                  </select>
+                </label>
+                <label>
+                  醫生
+                  <select name="doctor" id="doctorSelect"></select>
+                </label>
+                <label>
+                  需要技能
+                  <input name="requiredSkill" placeholder="例：植牙，可留空" />
+                </label>
+                <button class="primary span-2" type="submit">儲存診次</button>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel" id="rules">
+          <div class="rules-grid">
+            <section class="board">
+              <div class="section-title">
+                <h3>硬性規則</h3>
+              </div>
+              <ul class="rule-list">
+                <li>每個診次固定 1 位醫生、2 位牙助、2 位櫃檯。</li>
+                <li>人員不可被排在不可上班時段。</li>
+                <li>同一人同一時段不可重複上班。</li>
+                <li>不得超過每週最多班數。</li>
+                <li>特殊診次至少安排 1 位具備需求技能的牙助。</li>
+                <li>偏好規則只影響分數，不會覆蓋不可上班、週上限與技能要求。</li>
+              </ul>
+            </section>
+
+            <section class="board">
+              <div class="section-title">
+                <h3>公平權重</h3>
+              </div>
+              <div class="slider-list">
+                <label>
+                  總班數平均
+                  <input id="weightTotal" type="range" min="1" max="10" value="8" />
+                </label>
+                <label>
+                  晚班平均
+                  <input id="weightNight" type="range" min="1" max="10" value="7" />
+                </label>
+                <label>
+                  週末平均
+                  <input id="weightWeekend" type="range" min="1" max="10" value="9" />
+                </label>
+                <label>
+                  避免同班
+                  <input id="weightAvoid" type="range" min="1" max="10" value="6" />
+                </label>
+                <label>
+                  個人偏好
+                  <input id="weightPreference" type="range" min="1" max="10" value="5" />
+                </label>
+              </div>
+            </section>
+
+            <section class="board">
+              <div class="section-title">
+                <h3>偏好規則</h3>
+              </div>
+              <ul class="rule-list">
+                <li>偏好同班：同診次出現偏好對象時加分。</li>
+                <li>避免同班：同診次出現避免對象時大幅扣分。</li>
+                <li>偏好上班時段：符合時加分。</li>
+                <li>不想上班時段：仍可安排，但會扣分。</li>
+                <li>真正不能上班請填在「可上班時段」之外，不要只填不想上班。</li>
+              </ul>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
